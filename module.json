@@ -1,0 +1,39 @@
+{
+  "id": "cypher-almanach",
+  "title": "Cypher Almanach - Modern Glassmorphic Journal",
+  "description": "A high-performance, frameless, dark glassmorphic Journal sheet for Foundry VTT storing fully unsanitized HTML/CSS/JS in document flags, with pixel-perfect iframe rendering (fit-to-width default, fit-page, manual zoom, click-and-drag panning), a custom draggable header that collapses into a labeled overflow menu on narrow windows, WYSIWYG editor, UUID linking, ownership permissions, selective player broadcasting, and Cypher System triggers.",
+  "version": "1.14.1",
+  "compatibility": {
+    "minimum": "13",
+    "verified": "14"
+  },
+  "authors": [
+    {
+      "name": "Cypher Almanach Team",
+      "flags": {}
+    }
+  ],
+  "relationships": {
+    "systems": [
+      {
+        "id": "cyphersystem",
+        "type": "system",
+        "manifest": "https://raw.githubusercontent.com/mrkwnzl/cyphersystem-foundryvtt/master/system.json",
+        "compatibility": {}
+      }
+    ]
+  },
+  "esmodules": [
+    "scripts/cypher-almanach.js"
+  ],
+  "styles": [
+    "styles/cypher-almanach.css"
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ]
+}

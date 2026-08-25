@@ -1,0 +1,61 @@
+{
+  "CYPHER_ALMANACH": {
+    "Title": "Cypher Almanach",
+    "SheetName": "Cypher Almanach (Glassmorphic Raw HTML)",
+    "CreateAlmanachButton": "Create Almanach",
+    "CreateStandardButton": "Create WYSIWYG Journal",
+    "CreateInFolder": "Create Almanach in Folder",
+    "CreateStandardInFolder": "Create WYSIWYG Journal in Folder",
+    "DialogTitle": "Create Journal Entry",
+    "DialogTypeLabel": "Journal Type / Editor Mode",
+    "OptionAlmanach": "Cypher Almanach (Glassmorphic Raw HTML / Scripts)",
+    "OptionDefault": "Standard Journal (WYSIWYG Rich Text Editor)",
+    "ShareDialog": {
+      "Title": "Show Almanach to Players",
+      "Header": "Select target players to display '{title}'",
+      "AllPlayers": "All Players (Everyone)",
+      "ActiveOnly": "Active",
+      "Offline": "Offline",
+      "NoPlayers": "No other players currently registered in this world.",
+      "ShowBtn": "SHOW",
+      "CancelBtn": "CANCEL"
+    },
+    "Tabs": {
+      "NewPage": "New Page",
+      "Untitled": "Untitled Page",
+      "AddPage": "Add Page",
+      "DeletePage": "Delete Page"
+    },
+    "Controls": {
+      "UploadHtml": "Upload .html File",
+      "DropHtmlHint": "Drop .html file here to load raw code",
+      "ToggleCode": "Code (Raw HTML)",
+      "ToggleWysiwyg": "Visual (WYSIWYG)",
+      "TogglePreview": "Preview",
+      "Save": "Save Changes",
+      "ExecuteScripts": "Execute Inline Scripts",
+      "CypherTools": "Cypher System Roller",
+      "Share": "Show to Players",
+      "CopyUuid": "Copy Document UUID link",
+      "ConfigureOwnership": "Configure Ownership / Permissions",
+      "FitWidth": "Fit to Width (scroll vertically)",
+      "FitPage": "Fit Whole Page (no scroll)",
+      "ZoomIn": "Zoom In",
+      "ZoomOut": "Zoom Out",
+      "ZoomReset": "Reset Zoom to 100%",
+      "MoreActions": "More Actions",
+      "DragHint": "Click and drag empty header space to move this window. Click and drag the document to pan it.",
+      "Close": "Close Almanach"
+    },
+    "Notifications": {
+      "FileLoaded": "Loaded HTML file: {file}",
+      "InvalidFile": "Please upload a valid .html or text file.",
+      "PageCreated": "Created new page.",
+      "PageDeleted": "Deleted page.",
+      "Saved": "Document and page changes saved successfully (stored unsanitized).",
+      "UuidCopied": "Copied UUID to clipboard: {uuid}",
+      "SharedAll": "Displayed '{name}' to all players.",
+      "SharedSelected": "Displayed '{name}' to {count} chosen player(s)."
+    }
+  }
+}

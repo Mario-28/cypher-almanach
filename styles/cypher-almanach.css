@@ -1,0 +1,385 @@
+/* Cypher Almanach - Dark Glassmorphic Styling for Foundry VTT v14+ */
+
+.cypher-almanach-window {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.75), 0 0 1px rgba(0, 240, 255, 0.3) !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+}
+
+.cypher-almanach-window .window-header { display: none !important; }
+
+.cypher-almanach-window .window-content {
+  padding: 0 !important;
+  margin: 0 !important;
+  background: rgba(13, 17, 23, 0.82) !important;
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px !important;
+  color: #e6edf3 !important;
+  overflow: hidden !important;
+  height: 100% !important;
+}
+
+.cypher-almanach-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.almanach-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: rgba(22, 27, 34, 0.75);
+  border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+  gap: 12px;
+  min-height: 48px;
+  position: relative;
+  cursor: grab;
+}
+
+.almanach-header.dragging { cursor: grabbing; user-select: none; }
+
+.almanach-branding { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 0.95rem; color: #00f0ff; letter-spacing: 0.5px; flex-shrink: 0; }
+.almanach-branding .pulse-icon { animation: cypher-pulse 3s infinite ease-in-out; }
+
+@keyframes cypher-pulse {
+  0%, 100% { opacity: 0.8; transform: scale(1); filter: drop-shadow(0 0 2px #00f0ff); }
+  50% { opacity: 1; transform: scale(1.1); filter: drop-shadow(0 0 6px #00f0ff); }
+}
+
+.almanach-title-edit-container { display: flex; align-items: center; cursor: text; }
+
+.almanach-doc-name-input {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #f0f6fc;
+  font-size: 0.92rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  width: 170px;
+  transition: all 0.2s ease;
+  cursor: text;
+}
+
+.almanach-doc-name-input:hover { border-color: rgba(0, 240, 255, 0.3); background: rgba(0, 0, 0, 0.4); }
+.almanach-doc-name-input:focus { outline: none; border-color: #00f0ff; background: rgba(10, 14, 20, 0.9); box-shadow: 0 0 8px rgba(0, 240, 255, 0.25); width: 220px; }
+
+.almanach-title { color: #f0f6fc; font-size: 0.9rem; max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.almanach-uuid-badge {
+  background: rgba(0, 240, 255, 0.08);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  color: #79c0ff;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+}
+
+.almanach-uuid-badge:hover { background: rgba(0, 240, 255, 0.2); color: #ffffff; border-color: #00f0ff; box-shadow: 0 0 6px rgba(0, 240, 255, 0.3); }
+
+.almanach-tabs { display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none; flex: 1; padding: 0 8px; min-width: 0; cursor: grab; }
+.almanach-tabs::-webkit-scrollbar { display: none; }
+
+.almanach-tab-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: #8b949e;
+  padding: 4px 10px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.almanach-tab-btn:hover { background: rgba(0, 240, 255, 0.1); color: #f0f6fc; border-color: rgba(0, 240, 255, 0.3); }
+.almanach-tab-btn.active { background: linear-gradient(135deg, rgba(0, 240, 255, 0.2), rgba(0, 119, 255, 0.15)); border-color: #00f0ff; color: #00f0ff; box-shadow: 0 0 8px rgba(0, 240, 255, 0.2); font-weight: 500; }
+.almanach-tab-btn .tab-close { opacity: 0.5; font-size: 1rem; margin-left: 4px; }
+.almanach-tab-btn .tab-close:hover { opacity: 1; color: #ff7b72; }
+.almanach-tab-btn.add-tab { padding: 4px 8px; }
+
+.almanach-controls-wrap { position: relative; display: flex; align-items: center; flex-shrink: 0; cursor: default; }
+
+.almanach-controls { display: flex; align-items: center; gap: 6px; }
+
+.almanach-header.collapsed .almanach-controls { display: none; }
+.almanach-more-btn { display: none; }
+.almanach-header.collapsed .almanach-more-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  color: #00f0ff;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.almanach-header.collapsed .almanach-more-btn:hover {
+  background: rgba(0, 240, 255, 0.2);
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
+}
+
+.almanach-overflow-panel {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(13, 17, 23, 0.97);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  border-radius: 10px;
+  padding: 10px;
+  min-width: 200px;
+  max-height: 70vh;
+  overflow-y: auto;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65);
+  z-index: 100;
+  cursor: default;
+}
+
+.almanach-overflow-panel.open { display: flex; }
+
+.almanach-overflow-panel .almanach-btn,
+.almanach-overflow-panel .almanach-zoom-controls,
+.almanach-overflow-panel .almanach-mode-switch,
+.almanach-overflow-panel .almanach-upload-btn {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.almanach-overflow-panel .almanach-mode-switch { flex-direction: column; }
+.almanach-overflow-panel .almanach-mode-switch .mode-btn { justify-content: flex-start; }
+
+/* Button labels: several inline header buttons (Cypher rollers, Permissions,
+   Close) are intentionally icon-only in the compact bar to save space, but the
+   same buttons show their full text label once physically moved into the
+   "more actions" overflow dropdown, where there's plenty of room and icon-only
+   buttons would otherwise look blank/unlabeled. */
+.almanach-controls .almanach-cypher-btn .btn-label,
+.almanach-controls .almanach-permission-btn .btn-label,
+.almanach-controls .almanach-close-btn .btn-label {
+  display: none;
+}
+
+.almanach-overflow-panel .btn-label {
+  display: inline;
+}
+
+.almanach-mode-switch { display: flex; background: rgba(0, 0, 0, 0.35); border-radius: 6px; padding: 2px; border: 1px solid rgba(255, 255, 255, 0.08); gap: 2px; cursor: default; }
+.almanach-mode-switch .mode-btn { border: none; background: transparent; padding: 3px 8px; font-size: 0.76rem; border-radius: 4px; }
+.almanach-mode-switch .mode-btn.active { background: rgba(0, 240, 255, 0.2); color: #00f0ff; font-weight: 600; }
+
+.almanach-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #c9d1d9;
+  border-radius: 6px;
+  padding: 5px 9px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s ease;
+}
+
+.almanach-btn:hover { background: rgba(0, 240, 255, 0.15); color: #ffffff; border-color: #00f0ff; }
+.almanach-btn.highlight { background: rgba(0, 255, 170, 0.15); border-color: #00ffaa; color: #00ffaa; }
+.almanach-btn.highlight:hover { background: rgba(0, 255, 170, 0.3); color: #ffffff; }
+.almanach-cypher-btn { color: #00f0ff; }
+
+.almanach-fit-btn { color: #c8a2ff !important; border-color: rgba(200, 162, 255, 0.25) !important; background: rgba(200, 162, 255, 0.08) !important; }
+.almanach-fit-btn:hover { background: rgba(200, 162, 255, 0.22) !important; border-color: #c8a2ff !important; color: #ffffff !important; box-shadow: 0 0 8px rgba(200, 162, 255, 0.3) !important; }
+
+.almanach-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 2px;
+  cursor: default;
+}
+
+.almanach-zoom-btn { border: none !important; background: transparent !important; padding: 4px 7px !important; }
+.almanach-zoom-btn:hover { background: rgba(0, 240, 255, 0.15) !important; }
+
+.almanach-zoom-level {
+  font-size: 0.75rem;
+  color: #8b949e;
+  min-width: 40px;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  padding: 0 4px;
+}
+.almanach-zoom-level:hover { color: #00f0ff; }
+
+.almanach-permission-btn { color: #e3b341 !important; }
+.almanach-permission-btn:hover { background: rgba(227, 179, 65, 0.2) !important; border-color: #e3b341 !important; color: #ffffff !important; }
+
+.almanach-share-btn { background: rgba(0, 255, 170, 0.08) !important; border-color: rgba(0, 255, 170, 0.3) !important; color: #00ffaa !important; }
+.almanach-share-btn:hover { background: rgba(0, 255, 170, 0.22) !important; color: #ffffff !important; border-color: #00ffaa !important; box-shadow: 0 0 8px rgba(0, 255, 170, 0.3) !important; }
+
+.almanach-close-btn { background: rgba(255, 75, 75, 0.08) !important; border-color: rgba(255, 75, 75, 0.25) !important; color: #ff7b72 !important; padding: 5px 8px !important; }
+.almanach-close-btn:hover { background: rgba(255, 75, 75, 0.3) !important; border-color: #ff7b72 !important; color: #ffffff !important; box-shadow: 0 0 8px rgba(255, 75, 75, 0.4) !important; }
+
+.almanach-cypher-toolbar { display: none; background: rgba(10, 14, 20, 0.9); padding: 6px 16px; border-bottom: 1px solid rgba(0, 240, 255, 0.1); gap: 10px; align-items: center; }
+.almanach-cypher-toolbar.visible { display: flex; }
+
+.cypher-badge { background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); padding: 3px 8px; border-radius: 12px; font-size: 0.75rem; cursor: pointer; transition: all 0.2s ease; }
+.cypher-badge.stat-might:hover { background: rgba(255, 68, 68, 0.2); border-color: #ff4444; color: #ff8888; }
+.cypher-badge.stat-speed:hover { background: rgba(0, 204, 136, 0.2); border-color: #00cc88; color: #66ffbb; }
+.cypher-badge.stat-intellect:hover { background: rgba(51, 153, 255, 0.2); border-color: #3399ff; color: #88ccff; }
+.cypher-badge.stat-d20:hover { background: rgba(0, 240, 255, 0.2); border-color: #00f0ff; color: #00f0ff; }
+.cypher-badge.stat-gm-intrusion:hover { background: rgba(255, 170, 0, 0.2); border-color: #ffaa00; color: #ffcc00; }
+
+.almanach-body { flex: 1; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+.almanach-body.drag-over { border: 2px dashed #00f0ff !important; background: rgba(0, 240, 255, 0.05); }
+
+.almanach-rendered-container {
+  flex: 1;
+  position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0;
+  margin: 0;
+  background: #1c2128;
+  box-sizing: border-box;
+  cursor: grab;
+}
+
+.almanach-rendered-container.panning { cursor: grabbing; }
+
+.almanach-rendered-iframe {
+  border: none;
+  display: block;
+  background: #ffffff;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+}
+
+.almanach-editor-wrapper, .almanach-wysiwyg-wrapper { display: flex; flex-direction: column; height: 100%; padding: 12px; gap: 8px; }
+.editor-subbar, .wysiwyg-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+.wysiwyg-tools { display: flex; gap: 4px; background: rgba(0, 0, 0, 0.4); padding: 4px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.08); }
+.wysiwyg-cmd-btn { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #e6edf3; border-radius: 4px; padding: 4px 8px; font-size: 0.8rem; cursor: pointer; transition: all 0.15s ease; }
+.wysiwyg-cmd-btn:hover { background: rgba(0, 240, 255, 0.2); color: #00f0ff; }
+
+.almanach-page-title-input { background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px; color: #ffffff; padding: 6px 12px; font-size: 0.95rem; width: 260px; }
+.editor-info { font-size: 0.75rem; color: #00f0ff; }
+
+.almanach-raw-editor {
+  flex: 1;
+  width: 100%;
+  background: rgba(10, 12, 16, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #79c0ff;
+  font-family: "Fira Code", "Courier New", Courier, monospace;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  padding: 14px;
+  resize: none;
+  box-sizing: border-box;
+}
+
+.almanach-raw-editor:focus { outline: none; border-color: #00f0ff; box-shadow: 0 0 10px rgba(0, 240, 255, 0.2); }
+
+.almanach-wysiwyg-editor {
+  flex: 1;
+  width: 100%;
+  background: rgba(10, 14, 20, 0.8);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  border-radius: 8px;
+  color: #e6edf3;
+  padding: 16px;
+  overflow-y: auto;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.almanach-wysiwyg-editor:focus { border-color: #00f0ff; box-shadow: 0 0 10px rgba(0, 240, 255, 0.2); }
+
+.almanach-empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #8b949e; gap: 8px; }
+.empty-icon { font-size: 3rem; color: #30363d; }
+
+.cypher-chat-card { background: rgba(22, 27, 34, 0.9); border: 1px solid rgba(0, 240, 255, 0.3); border-radius: 8px; padding: 8px 12px; color: #e6edf3; margin: 4px 0; }
+.cypher-chat-card .card-header { color: #00f0ff; font-size: 0.88rem; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 4px; margin-bottom: 6px; }
+.cypher-chat-card .result-number { color: #00f0ff; font-weight: 700; font-size: 1.1rem; }
+.cypher-chat-card .roll-special.gmi { color: #ffaa00; font-weight: 700; margin-top: 4px; }
+.cypher-chat-card .roll-special.major { color: #00ffcc; font-weight: 700; margin-top: 4px; }
+.cypher-chat-card.gm-intrusion { border-color: #ffaa00; background: rgba(40, 25, 10, 0.9); }
+
+.create-almanach-btn {
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.15), rgba(0, 119, 255, 0.2)) !important;
+  border: 1px solid rgba(0, 240, 255, 0.4) !important;
+  color: #00f0ff !important;
+  font-weight: 600 !important;
+  padding: 4px 8px !important;
+  font-size: 0.78rem !important;
+  border-radius: 4px !important;
+  cursor: pointer !important;
+  text-shadow: 0 0 6px rgba(0, 240, 255, 0.3) !important;
+  transition: all 0.2s ease !important;
+}
+.create-almanach-btn:hover { background: linear-gradient(135deg, rgba(0, 240, 255, 0.3), rgba(0, 119, 255, 0.35)) !important; box-shadow: 0 0 8px rgba(0, 240, 255, 0.4) !important; color: #ffffff !important; }
+
+.create-standard-btn {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  color: #c9d1d9 !important;
+  padding: 4px 8px !important;
+  font-size: 0.78rem !important;
+  border-radius: 4px !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+.create-standard-btn:hover { background: rgba(255, 255, 255, 0.15) !important; color: #ffffff !important; }
+
+.cypher-almanach-create-form select, .cypher-almanach-create-form input[type="text"] {
+  background: rgba(13, 17, 23, 0.9);
+  color: #00f0ff;
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  border-radius: 4px;
+  padding: 6px;
+}
+
+.almanach-share-form { display: flex; flex-direction: column; gap: 12px; font-family: inherit; color: #e6edf3; }
+.share-desc { font-size: 0.88rem; color: #8b949e; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 8px; }
+.share-options-box { background: rgba(10, 14, 20, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 8px 12px; display: flex; flex-direction: column; gap: 8px; }
+.share-player-item { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 6px; cursor: pointer; transition: background 0.2s ease; }
+.share-player-item:hover { background: rgba(0, 240, 255, 0.08); }
+.share-player-item input[type="checkbox"] { accent-color: #00f0ff; width: 16px; height: 16px; cursor: pointer; margin: 0; }
+.share-player-item .player-name { flex: 1; font-size: 0.9rem; color: #f0f6fc; }
+.all-players-option { color: #00f0ff; }
+.all-players-option .player-name { color: #00f0ff; }
+.share-divider { border: none; border-top: 1px solid rgba(255, 255, 255, 0.08); margin: 2px 0; }
+.share-players-list { display: flex; flex-direction: column; gap: 4px; max-height: 180px; overflow-y: auto; }
+.player-status { font-size: 0.72rem; padding: 2px 6px; border-radius: 10px; display: inline-flex; align-items: center; gap: 4px; }
+.player-status.active { background: rgba(0, 255, 136, 0.15); color: #00ff88; }
+.player-status.offline { background: rgba(255, 255, 255, 0.06); color: #8b949e; }
+.share-no-players { font-size: 0.85rem; color: #8b949e; font-style: italic; padding: 8px; text-align: center; }

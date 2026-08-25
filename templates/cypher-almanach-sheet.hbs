@@ -1,0 +1,178 @@
+<div class="cypher-almanach-root">
+  <header class="almanach-header">
+    <div class="almanach-branding">
+      <i class="fa-solid fa-atom pulse-icon"></i>
+
+      {{#if isEditable}}
+      <div class="almanach-title-edit-container" title="Click to edit document name">
+        <input type="text" class="almanach-doc-name-input" value="{{document.name}}" placeholder="Document Title..." data-action="updateDocName" />
+      </div>
+      {{else}}
+      <span class="almanach-title" title="{{document.name}}">{{document.name}}</span>
+      {{/if}}
+
+      <button type="button" class="almanach-uuid-badge" data-action="copyUuid" title="Click to copy @UUID link">
+        <i class="fa-solid fa-passport"></i>
+        <span>UUID</span>
+      </button>
+    </div>
+
+    <nav class="almanach-tabs" data-group="primary">
+      {{#each pages as |page idx|}}
+      <button type="button" class="almanach-tab-btn {{#if page.active}}active{{/if}}" data-action="selectPage" data-page-id="{{page.id}}" title="{{page.name}}">
+        <span class="tab-label">{{page.name}}</span>
+        {{#if ../isEditable}}
+        <span class="tab-close" data-action="deletePage" data-page-id="{{page.id}}" title="Delete Page">&times;</span>
+        {{/if}}
+      </button>
+      {{/each}}
+      {{#if isEditable}}
+      <button type="button" class="almanach-tab-btn add-tab" data-action="createPage" title="Add New Page">
+        <i class="fa-solid fa-plus"></i>
+      </button>
+      {{/if}}
+    </nav>
+
+    <div class="almanach-controls-wrap">
+      <div class="almanach-controls">
+        {{#if isPreviewMode}}
+        <div class="almanach-zoom-controls">
+          <button type="button" class="almanach-btn almanach-zoom-btn" data-action="zoomOut" title="Zoom Out">
+            <i class="fa-solid fa-magnifying-glass-minus"></i>
+          </button>
+          <span class="almanach-zoom-level" data-action="zoomReset" title="Reset Zoom to 100%">{{zoomPercent}}%</span>
+          <button type="button" class="almanach-btn almanach-zoom-btn" data-action="zoomIn" title="Zoom In">
+            <i class="fa-solid fa-magnifying-glass-plus"></i>
+          </button>
+        </div>
+
+        <button type="button" class="almanach-btn almanach-fit-btn" data-action="toggleFitMode" title="{{#if isFitWidth}}Currently: Fit to Width (click for Fit Whole Page){{else}}Currently: Fit Whole Page (click for Fit to Width){{/if}}">
+          <i class="fa-solid {{#if isFitWidth}}fa-arrows-left-right{{else}}fa-expand{{/if}}"></i>
+          <span class="btn-label">{{#if isFitWidth}}Fit Width{{else}}Fit Page{{/if}}</span>
+        </button>
+        {{/if}}
+
+        {{#if isEditable}}
+        <label class="almanach-btn almanach-upload-btn" title="Upload HTML File">
+          <i class="fa-solid fa-file-code"></i>
+          <span class="btn-label">Upload</span>
+          <input type="file" class="almanach-file-input" accept=".html,.htm,.txt" style="display:none;" />
+        </label>
+
+        <div class="almanach-mode-switch">
+          <button type="button" class="almanach-btn mode-btn {{#if isPreviewMode}}active{{/if}}" data-action="setMode" data-mode="preview" title="Rendered Preview">
+            <i class="fa-solid fa-eye"></i>
+            <span class="btn-label">View</span>
+          </button>
+          <button type="button" class="almanach-btn mode-btn {{#if isWysiwygMode}}active{{/if}}" data-action="setMode" data-mode="wysiwyg" title="Visual WYSIWYG Editor">
+            <i class="fa-solid fa-pen-nib"></i>
+            <span class="btn-label">WYSIWYG</span>
+          </button>
+          <button type="button" class="almanach-btn mode-btn {{#if isCodeMode}}active{{/if}}" data-action="setMode" data-mode="code" title="Raw HTML/JS Code Editor">
+            <i class="fa-solid fa-code"></i>
+            <span class="btn-label">HTML</span>
+          </button>
+        </div>
+
+        {{#unless isPreviewMode}}
+        <button type="button" class="almanach-btn almanach-save-btn highlight" data-action="saveContent" title="Save Content">
+          <i class="fa-solid fa-floppy-disk"></i>
+          <span class="btn-label">Save</span>
+        </button>
+        {{/unless}}
+        {{/if}}
+
+        <button type="button" class="almanach-btn almanach-cypher-btn" data-action="toggleCypherBar" title="Cypher Quick Rollers">
+          <i class="fa-solid fa-dice-d20"></i>
+          <span class="btn-label">Cypher Rollers</span>
+        </button>
+
+        {{#if isGM}}
+        <button type="button" class="almanach-btn almanach-permission-btn" data-action="configureOwnership" title="Configure Ownership / Player Permissions">
+          <i class="fa-solid fa-user-lock"></i>
+          <span class="btn-label">Permissions</span>
+        </button>
+
+        <button type="button" class="almanach-btn almanach-share-btn" data-action="shareToPlayers" title="Show this almanach to players">
+          <i class="fa-solid fa-bullhorn"></i>
+          <span class="btn-label">Show</span>
+        </button>
+        {{/if}}
+
+        <button type="button" class="almanach-btn almanach-close-btn" data-action="closeWindow" title="Close Window">
+          <i class="fa-solid fa-xmark"></i>
+          <span class="btn-label">Close</span>
+        </button>
+      </div>
+
+      <button type="button" class="almanach-more-btn" data-action="toggleOverflowMenu" title="More Actions">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+
+      <div class="almanach-overflow-panel"></div>
+    </div>
+  </header>
+
+  <div class="almanach-cypher-toolbar {{#if showCypherBar}}visible{{/if}}">
+    <span class="cypher-badge stat-might" data-action="rollStat" data-stat="Might">
+      <i class="fa-solid fa-hand-fist"></i> Might
+    </span>
+    <span class="cypher-badge stat-speed" data-action="rollStat" data-stat="Speed">
+      <i class="fa-solid fa-bolt"></i> Speed
+    </span>
+    <span class="cypher-badge stat-intellect" data-action="rollStat" data-stat="Intellect">
+      <i class="fa-solid fa-brain"></i> Intellect
+    </span>
+    <span class="cypher-badge stat-d20" data-action="rollCypherD20">
+      <i class="fa-solid fa-dice-d20"></i> D20 Task Roll
+    </span>
+    <span class="cypher-badge stat-gm-intrusion" data-action="triggerGMI">
+      <i class="fa-solid fa-triangle-exclamation"></i> GM Intrusion
+    </span>
+  </div>
+
+  <main class="almanach-body drop-zone">
+    {{#if activePage}}
+      {{#if isCodeMode}}
+        <div class="almanach-editor-wrapper">
+          <div class="editor-subbar">
+            <input type="text" class="almanach-page-title-input" value="{{activePage.name}}" placeholder="Page Title" />
+            <span class="editor-info"><i class="fa-solid fa-shield-halved"></i> Unsanitized Raw HTML/JS (Stored in Flags, Bypasses Core Sanitizer)</span>
+          </div>
+          <textarea class="almanach-raw-editor" placeholder="Write or paste pure unsanitized HTML / CSS / JS here..." spellcheck="false">{{{activePageRawHtml}}}</textarea>
+        </div>
+      {{else if isWysiwygMode}}
+        <div class="almanach-wysiwyg-wrapper">
+          <div class="wysiwyg-toolbar">
+            <input type="text" class="almanach-page-title-input" value="{{activePage.name}}" placeholder="Page Title" />
+            <div class="wysiwyg-tools">
+              <button type="button" class="wysiwyg-cmd-btn" data-cmd="bold" title="Bold"><i class="fa-solid fa-bold"></i></button>
+              <button type="button" class="wysiwyg-cmd-btn" data-cmd="italic" title="Italic"><i class="fa-solid fa-italic"></i></button>
+              <button type="button" class="wysiwyg-cmd-btn" data-cmd="underline" title="Underline"><i class="fa-solid fa-underline"></i></button>
+              <button type="button" class="wysiwyg-cmd-btn" data-cmd="formatBlock" data-val="h1" title="Heading 1">H1</button>
+              <button type="button" class="wysiwyg-cmd-btn" data-cmd="formatBlock" data-val="h2" title="Heading 2">H2</button>
+              <button type="button" class="wysiwyg-cmd-btn" data-cmd="formatBlock" data-val="p" title="Paragraph">P</button>
+              <button type="button" class="wysiwyg-cmd-btn" data-cmd="insertUnorderedList" title="Bullet List"><i class="fa-solid fa-list-ul"></i></button>
+              <button type="button" class="wysiwyg-cmd-btn" data-cmd="insertOrderedList" title="Numbered List"><i class="fa-solid fa-list-ol"></i></button>
+            </div>
+          </div>
+          <div class="almanach-wysiwyg-editor custom-scroll" contenteditable="true" data-page-id="{{activePage.id}}">
+            {{{activePageRawHtml}}}
+          </div>
+        </div>
+      {{else}}
+        <div class="almanach-rendered-container" data-page-id="{{activePage.id}}">
+          <!-- An auto-fitting, pannable iframe with srcdoc is injected here via
+               JavaScript. Default mode: fit to window WIDTH, with manual zoom and
+               click-and-drag panning. -->
+        </div>
+      {{/if}}
+    {{else}}
+      <div class="almanach-empty-state">
+        <i class="fa-solid fa-scroll empty-icon"></i>
+        <h3>No pages in this Almanach</h3>
+        <p>Click "Add Page" or drop an .html file anywhere in this window to begin.</p>
+      </div>
+    {{/if}}
+  </main>
+</div>
