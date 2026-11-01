@@ -90,7 +90,7 @@
 
 .almanach-uuid-badge:hover { background: rgba(0, 240, 255, 0.2); color: #ffffff; border-color: #00f0ff; box-shadow: 0 0 6px rgba(0, 240, 255, 0.3); }
 
-.almanach-tabs { display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none; flex: 1; padding: 0 8px; min-width: 0; cursor: grab; }
+.almanach-tabs { display: flex; align-items: center; gap: 6px; overflow: hidden; scrollbar-width: none; flex: 1; padding: 0 8px; min-width: 0; cursor: grab; }
 .almanach-tabs::-webkit-scrollbar { display: none; }
 
 .almanach-tab-btn {
@@ -111,9 +111,175 @@
 
 .almanach-tab-btn:hover { background: rgba(0, 240, 255, 0.1); color: #f0f6fc; border-color: rgba(0, 240, 255, 0.3); }
 .almanach-tab-btn.active { background: linear-gradient(135deg, rgba(0, 240, 255, 0.2), rgba(0, 119, 255, 0.15)); border-color: #00f0ff; color: #00f0ff; box-shadow: 0 0 8px rgba(0, 240, 255, 0.2); font-weight: 500; }
-.almanach-tab-btn .tab-close { opacity: 0.5; font-size: 1rem; margin-left: 4px; }
-.almanach-tab-btn .tab-close:hover { opacity: 1; color: #ff7b72; }
 .almanach-tab-btn.add-tab { padding: 4px 8px; }
+
+/* Tab + its delete button as siblings (the × is NOT nested inside the tab
+ * button, so AppV2's closest([data-action]) dispatch resolves it cleanly).
+ * The × floats at the tab's right edge. */
+.almanach-tab-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
+.almanach-tab-wrap .almanach-tab-btn { padding-right: 20px; }
+.almanach-tab-wrap .tab-close {
+  position: absolute;
+  top: 50%;
+  right: 3px;
+  transform: translateY(-50%);
+  width: 15px;
+  height: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: #8b949e;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.almanach-tab-wrap .tab-close:hover { opacity: 1; color: #ff7b72; background: rgba(255, 60, 60, 0.14); }
+
+/* Tab color → tinted tab background + border (wrap carries --tab-color) */
+.almanach-tab-wrap[style*="--tab-color"] .almanach-tab-btn {
+  background: color-mix(in srgb, var(--tab-color) 18%, rgba(255, 255, 255, 0.04));
+  border-color: color-mix(in srgb, var(--tab-color) 55%, rgba(255, 255, 255, 0.08));
+}
+.almanach-tab-wrap[style*="--tab-color"] .almanach-tab-btn:hover {
+  background: color-mix(in srgb, var(--tab-color) 30%, rgba(255, 255, 255, 0.05));
+  color: #fff;
+}
+.almanach-tab-wrap[style*="--tab-color"] .almanach-tab-btn.active {
+  background: color-mix(in srgb, var(--tab-color) 30%, rgba(255, 255, 255, 0.06));
+  border-color: var(--tab-color);
+  color: #fff;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--tab-color) 45%, transparent);
+}
+
+/* Optional done-checkbox on the tab (left edge) */
+.almanach-tab-wrap .tab-check {
+  display: none;
+  position: absolute;
+  left: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  padding: 0;
+  accent-color: #00f0ff;
+  cursor: pointer;
+  z-index: 1;
+}
+.almanach-tab-wrap.has-check .tab-check { display: block; }
+.almanach-tab-wrap.has-check .almanach-tab-btn { padding-left: 20px; }
+.almanach-tab-wrap .tab-check:disabled { cursor: default; }
+
+/* Checked tab — just greyed out, nothing else */
+.almanach-tab-wrap.checked .almanach-tab-btn { filter: grayscale(1); opacity: 0.45; }
+.almanach-tab-wrap.checked .tab-check { accent-color: #8b949e; }
+
+/* ------------------------------------------------------------------ */
+/*  Tab context menu (right-click a tab)                               */
+/* ------------------------------------------------------------------ */
+.almanach-tabmenu {
+  position: fixed;
+  z-index: 10000;
+  min-width: 214px;
+  background: rgba(13, 17, 23, 0.96);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: #e6edf3;
+  font-size: 0.82rem;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6), 0 0 1px rgba(0, 240, 255, 0.3);
+}
+.almanach-tabmenu .tabmenu-title {
+  font-weight: 600;
+  color: #00f0ff;
+  margin-bottom: 8px;
+  max-width: 260px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.almanach-tabmenu .tabmenu-row { display: flex; gap: 6px; margin-bottom: 10px; }
+.almanach-tabmenu .tabmenu-name {
+  flex: 1;
+  min-width: 0;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: #e6edf3;
+  padding: 5px 8px;
+  font-size: 0.82rem;
+}
+.almanach-tabmenu .tabmenu-name:focus {
+  border-color: #00f0ff;
+  outline: 2px solid rgba(0, 240, 255, 0.25);
+  outline-offset: 0;
+}
+.almanach-tabmenu .tabmenu-rename {
+  width: 30px;
+  background: rgba(0, 240, 255, 0.12);
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  border-radius: 6px;
+  color: #00f0ff;
+  cursor: pointer;
+}
+.almanach-tabmenu .tabmenu-rename:hover { background: rgba(0, 240, 255, 0.22); }
+.almanach-tabmenu .tabmenu-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8b949e;
+  margin-bottom: 5px;
+}
+.almanach-tabmenu .tabmenu-colors { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.almanach-tabmenu .tabmenu-swatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: var(--sw);
+  cursor: pointer;
+}
+.almanach-tabmenu .tabmenu-swatch.selected { border-color: #fff; box-shadow: 0 0 6px var(--sw); }
+.almanach-tabmenu .tabmenu-swatch:hover { transform: scale(1.12); }
+.almanach-tabmenu .tabmenu-custom {
+  width: 28px;
+  height: 22px;
+  padding: 1px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 5px;
+  background: transparent;
+  cursor: pointer;
+}
+.almanach-tabmenu .tabmenu-clear {
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 5px;
+  color: #8b949e;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.almanach-tabmenu .tabmenu-clear:hover { color: #ff7b72; border-color: rgba(255, 123, 114, 0.4); }
+.almanach-tabmenu .tabmenu-check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  color: #c9d1d9;
+  margin: 0;
+}
+.almanach-tabmenu .tabmenu-check input { accent-color: #00f0ff; }
 
 .almanach-controls-wrap { position: relative; display: flex; align-items: center; flex-shrink: 0; cursor: default; }
 
@@ -383,3 +549,165 @@
 .player-status.active { background: rgba(0, 255, 136, 0.15); color: #00ff88; }
 .player-status.offline { background: rgba(255, 255, 255, 0.06); color: #8b949e; }
 .share-no-players { font-size: 0.85rem; color: #8b949e; font-style: italic; padding: 8px; text-align: center; }
+
+/* ------------------------------------------------------------------ */
+/*  Tabs overflow — more than 3 tabs fold into a right-side menu       */
+/* ------------------------------------------------------------------ */
+.almanach-tabs-toggle {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(0, 240, 255, 0.08);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  border-radius: 6px;
+  color: #00f0ff;
+  padding: 4px 8px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.almanach-tabs-toggle:hover,
+.almanach-tabs-toggle.open { background: rgba(0, 240, 255, 0.18); border-color: #00f0ff; }
+.almanach-tabs-toggle .tabs-badge {
+  background: rgba(0, 240, 255, 0.18);
+  border-radius: 8px;
+  padding: 0 5px;
+  font-size: 0.7rem;
+}
+
+.almanach-tabs-panel {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 30;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 170px;
+  max-width: 320px;
+  max-height: 65vh;
+  overflow-y: auto;
+  background: rgba(13, 17, 23, 0.96);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+}
+.almanach-tabs-panel.open { display: flex; }
+.almanach-tabs-panel .almanach-tab-wrap { display: flex; width: 100%; margin-right: 0; flex-shrink: 0; }
+.almanach-tabs-panel .almanach-tab-wrap .almanach-tab-btn { flex: 1; min-width: 0; justify-content: flex-start; }
+
+/* ── Image right-click menu ─────────────────────────────── */
+.almanach-imgmenu {
+  position: fixed;
+  z-index: 10001;
+  min-width: 200px;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: rgba(13, 17, 23, 0.97);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid rgba(0, 240, 255, 0.28);
+  border-radius: 10px;
+  padding: 7px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.65);
+}
+.almanach-imgmenu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: #d5e3f0;
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.almanach-imgmenu-item i {
+  width: 15px;
+  text-align: center;
+  color: #00f0ff;
+  font-size: 0.78rem;
+  flex-shrink: 0;
+}
+.almanach-imgmenu-item:hover {
+  background: rgba(0, 240, 255, 0.14);
+  border-color: rgba(0, 240, 255, 0.35);
+  color: #ffffff;
+}
+.almanach-imgmenu-caret { margin-left: auto; color: #7d93a8 !important; transition: transform 0.15s ease; }
+.almanach-imgmenu-sub-toggle.open .almanach-imgmenu-caret { transform: rotate(180deg); }
+
+.almanach-imgmenu-players {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 2px 0 4px 10px;
+  padding: 5px 5px 5px 9px;
+  border-left: 2px solid rgba(0, 240, 255, 0.3);
+}
+.almanach-imgmenu-players[hidden] { display: none; }
+.almanach-imgmenu-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: #c3d3e2;
+  cursor: pointer;
+}
+.almanach-imgmenu-player:hover { background: rgba(0, 240, 255, 0.1); }
+.almanach-imgmenu-player input { accent-color: #00f0ff; margin: 0; }
+.almanach-imgmenu-none { padding: 4px 8px; font-size: 0.75rem; color: #7d93a8; font-style: italic; }
+.almanach-imgmenu-show { margin-top: 3px; }
+
+/* ── Fancy image viewer window ──────────────────────────── */
+.cypher-almanach-image-viewer {
+  background: rgba(10, 14, 20, 0.92);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7), 0 0 24px rgba(0, 240, 255, 0.08);
+  overflow: hidden;
+}
+.cypher-almanach-image-viewer .window-header {
+  background: linear-gradient(90deg, rgba(0, 240, 255, 0.1), rgba(0, 240, 255, 0.02));
+  border-bottom: 1px solid rgba(0, 240, 255, 0.22);
+  color: #d5e3f0;
+}
+.cypher-almanach-image-viewer .window-header .window-title {
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+}
+.cypher-almanach-image-viewer > .window-content,
+.cypher-almanach-image-viewer [data-application-part="viewer"] {
+  background: transparent;
+}
+.almanach-image-viewer-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(0, 240, 255, 0.05), transparent 60%),
+    rgba(6, 9, 14, 0.6);
+}
+.almanach-image-viewer-body img {
+  max-width: 100%;
+  max-height: 75vh;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 240, 255, 0.18);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+}

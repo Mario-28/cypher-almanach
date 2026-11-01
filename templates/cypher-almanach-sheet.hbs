@@ -19,18 +19,26 @@
 
     <nav class="almanach-tabs" data-group="primary">
       {{#each pages as |page idx|}}
-      <button type="button" class="almanach-tab-btn {{#if page.active}}active{{/if}}" data-action="selectPage" data-page-id="{{page.id}}" title="{{page.name}}">
-        <span class="tab-label">{{page.name}}</span>
-        {{#if ../isEditable}}
-        <span class="tab-close" data-action="deletePage" data-page-id="{{page.id}}" title="Delete Page">&times;</span>
+      <div class="almanach-tab-wrap{{#if page.active}} active{{/if}}{{#if page.showCheckbox}} has-check{{/if}}{{#if page.checked}} checked{{/if}}" data-page-id="{{page.id}}"{{#if page.color}} style="--tab-color: {{page.color}}"{{/if}}>
+        {{#if page.showCheckbox}}
+        <input type="checkbox" class="tab-check" data-page-id="{{page.id}}"{{#if page.checked}} checked{{/if}}{{#unless ../isEditable}} disabled{{/unless}} title="Toggle done">
         {{/if}}
-      </button>
+        <button type="button" class="almanach-tab-btn {{#if page.active}}active{{/if}}" data-action="selectPage" data-page-id="{{page.id}}" title="{{page.name}}">
+          <span class="tab-label">{{page.name}}</span>
+        </button>
+        {{#if ../canDeletePages}}
+        <button type="button" class="tab-close" data-action="deletePage" data-page-id="{{page.id}}" title="Delete Page">&times;</button>
+        {{/if}}
+      </div>
       {{/each}}
       {{#if isEditable}}
       <button type="button" class="almanach-tab-btn add-tab" data-action="createPage" title="Add New Page">
         <i class="fa-solid fa-plus"></i>
       </button>
       {{/if}}
+      <button type="button" class="almanach-tabs-toggle" title="More tabs" style="display: none;">
+        <i class="fa-solid fa-caret-down"></i><span class="tabs-badge">0</span>
+      </button>
     </nav>
 
     <div class="almanach-controls-wrap">
@@ -110,6 +118,7 @@
       </button>
 
       <div class="almanach-overflow-panel"></div>
+      <div class="almanach-tabs-panel"></div>
     </div>
   </header>
 

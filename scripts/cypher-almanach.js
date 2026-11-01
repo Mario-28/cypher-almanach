@@ -33,6 +33,57 @@ async function setPageRawHtml(page, rawHtml, extraUpdates = {}) {
   return page.update(updates);
 }
 
+/**
+ * Fancy image viewer for the Almanach — a real ApplicationV2 window, which
+ * is what makes the Cypher Taskbar integrations work for free:
+ *
+ * - Minimize: the taskbar's `renderApplicationV2` hook injects its minimize
+ *   button into the native `.window-header`, and `_minimizeWindow()` docks
+ *   the window into the taskbar's window tray.
+ * - Blue hand: `options.src` makes the window hand-eligible, so the taskbar
+ *   injects the blue `fa-hand-paper` drag handle ("Drag to add to
+ *   People/Places/Assets/Secrets") whose payload is
+ *   `{ uuid: null, name: title, img: src, type: "Image" }`.
+ *
+ * Without the taskbar installed it is still a normal draggable, closable
+ * AppV2 window — the extra header buttons simply never appear.
+ */
+class AlmanachImageViewer extends HandlebarsApplicationMixin(foundry.applications.api.ApplicationV2) {
+  static DEFAULT_OPTIONS = {
+    id: "cypher-almanach-image-viewer",
+    classes: ["cypher-almanach-image-viewer"],
+    window: {
+      frame: true,
+      positioned: true,
+      controls: []
+    },
+    position: {
+      width: 720,
+      height: "auto"
+    },
+    src: null,
+    title: "Image",
+    actions: {}
+  };
+
+  static PARTS = {
+    viewer: {
+      template: "modules/cypher-almanach/templates/almanach-image-viewer.hbs"
+    }
+  };
+
+  get title() {
+    return this.options.title || "Image";
+  }
+
+  async _prepareContext() {
+    return {
+      src: this.options.src,
+      title: this.options.title
+    };
+  }
+}
+
 class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
   constructor(...args) {
     super(...args);
@@ -131,11 +182,20 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
       this._activePageId = activePage.id;
     }
 
-    context.pages = pages.map(p => ({
-      id: p.id,
-      name: p.name || "Untitled Page",
-      active: p.id === this._activePageId
-    }));
+    const authorId = doc?.author?.id ?? null;
+    context.canDeletePages = this.isEditable && (game.user.isGM || authorId === game.user.id);
+
+    context.pages = pages.map(p => {
+      const tabUi = p.getFlag?.(MODULE_ID, "tabUi") || {};
+      return {
+        id: p.id,
+        name: p.name || "Untitled Page",
+        active: p.id === this._activePageId,
+        color: tabUi.color || null,
+        showCheckbox: !!tabUi.showCheckbox,
+        checked: !!tabUi.checked
+      };
+    });
 
     context.activePage = activePage;
     context.activePageRawHtml = getPageRawHtml(activePage);
@@ -168,10 +228,11 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
     if (this._editorMode === "preview" && context.activePage) {
       const container = htmlEl.querySelector(".almanach-rendered-container");
       if (container) {
-        this._renderRawHtmlIntoContainer(container, context.activePageRawHtml || "");
+        this._renderRawHtmlIntoContainer(container, context.activePageRawHtml || "", context.activePage);
       }
     } else {
       this._disconnectFitObserver();
+      this._stopWorkbenchAutosave();
     }
 
     if (this._editorMode === "wysiwyg") {
@@ -188,6 +249,22 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
     this._bindUploadHandlers(htmlEl);
     this._setupResponsiveHeader(htmlEl);
     this._setupCustomHeaderDrag(htmlEl);
+    this._setupTabContextMenu(htmlEl);
+    this._setupTabsOverflow(htmlEl);
+
+    /* Tab checkboxes — toggling one only greys the tab out; state lives in
+     * the page's tabUi flag. Painted in place (no full re-render, so the
+     * preview iframe doesn't reload on every tick). */
+    if (!this._tabCheckBound) {
+      this._tabCheckBound = true;
+      htmlEl.addEventListener("change", async (e) => {
+        const cb = e.target.closest?.(".tab-check");
+        if (!cb || cb.disabled) return;
+        cb.closest(".almanach-tab-wrap")?.classList.toggle("checked", cb.checked);
+        const page = this.document.pages.get(cb.dataset.pageId);
+        if (page) await this._persistTabUi(page, { checked: cb.checked });
+      });
+    }
   }
 
   _onClose(options) {
@@ -195,6 +272,13 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
     this._disconnectHeaderObserver();
     this._disconnectPanHandlers();
     this._disconnectHeaderDrag();
+    this._closeTabMenu();
+    this._closeImageMenu();
+    this._stopWorkbenchAutosave();
+    if (this._tabsOutsideClick) {
+      document.removeEventListener("click", this._tabsOutsideClick);
+      this._tabsOutsideClick = null;
+    }
     return super._onClose?.(options);
   }
 
@@ -253,7 +337,7 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
 
     const onMouseDown = (e) => {
       if (e.button !== 0) return;
-      if (e.target.closest("button, input, a, .almanach-tab-btn, .almanach-uuid-badge, .almanach-overflow-panel")) return;
+      if (e.target.closest("button, input, a, .almanach-tab-btn, .almanach-uuid-badge, .almanach-overflow-panel, .almanach-tabs-panel")) return;
 
       isDragging = true;
       startX = e.clientX;
@@ -287,6 +371,340 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
     };
+  }
+
+  /* -------------------------------------------- */
+  /*  Tab context menu — rename / color / checkbox */
+  /* -------------------------------------------- */
+
+  _setupTabContextMenu(htmlEl) {
+    if (this._tabCtxBound) return;
+    this._tabCtxBound = true;
+    htmlEl.addEventListener("contextmenu", (e) => {
+      const wrap = e.target.closest(".almanach-tab-wrap");
+      if (!wrap || !this.isEditable) return;
+      e.preventDefault();
+      this._openTabMenu(e.clientX, e.clientY, wrap.dataset.pageId);
+    });
+  }
+
+  _closeTabMenu() {
+    if (this._tabMenu) {
+      this._tabMenu.remove();
+      this._tabMenu = null;
+      this._tabMenuPageId = null;
+    }
+    if (this._tabMenuOutside) {
+      document.removeEventListener("click", this._tabMenuOutside);
+      this._tabMenuOutside = null;
+    }
+    if (this._tabMenuKey) {
+      document.removeEventListener("keydown", this._tabMenuKey);
+      this._tabMenuKey = null;
+    }
+  }
+
+  async _persistTabUi(page, patch) {
+    const ui = page.getFlag(MODULE_ID, "tabUi") || {};
+    await page.setFlag(MODULE_ID, "tabUi", { ...ui, ...patch });
+  }
+
+  _tabWrapFor(pageId) {
+    return this.element?.querySelector(`.almanach-tab-wrap[data-page-id="${pageId}"]`);
+  }
+
+  /**
+   * Fancy glassmorphic popup on right-clicking a page tab: rename, color
+   * swatches + custom picker, and an option to put a done-checkbox on the
+   * tab. Color and checkbox changes are painted in place and persisted to
+   * the page's tabUi flag without a full sheet re-render; rename goes
+   * through a normal page update. The menu lives on document.body so the
+   * tab strip's overflow-x can't clip it.
+   */
+  _openTabMenu(x, y, pageId) {
+    this._closeTabMenu();
+    const page = this.document.pages.get(pageId);
+    if (!page) return;
+    const ui = page.getFlag(MODULE_ID, "tabUi") || {};
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => (
+      { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+    ));
+    const PRESETS = [
+      "#00f0ff", "#e8c95a", "#ff7b72", "#7ee787",
+      "#79c0ff", "#d2a8ff", "#ffa657", "#ff9bce", "#9da7b3"
+    ];
+
+    const menu = document.createElement("div");
+    menu.className = "almanach-tabmenu";
+    menu.innerHTML = `
+      <div class="tabmenu-title">${esc(page.name)}</div>
+      <div class="tabmenu-row">
+        <input type="text" class="tabmenu-name" value="${esc(page.name)}" placeholder="Tab name" spellcheck="false">
+        <button type="button" class="tabmenu-rename" title="Rename tab"><i class="fa-solid fa-check"></i></button>
+      </div>
+      <div class="tabmenu-label">Color</div>
+      <div class="tabmenu-colors">
+        ${PRESETS.map(c =>
+          `<button type="button" class="tabmenu-swatch${(ui.color || "").toLowerCase() === c ? " selected" : ""}" data-color="${c}" style="--sw:${c}" title="${c}"></button>`
+        ).join("")}
+        <input type="color" class="tabmenu-custom" value="${/^#[0-9a-f]{6}$/i.test(ui.color || "") ? ui.color : "#00f0ff"}" title="Custom color">
+        <button type="button" class="tabmenu-clear" title="No color"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <label class="tabmenu-check"><input type="checkbox" class="tabmenu-optcheck"${ui.showCheckbox ? " checked" : ""}> Show checkbox on tab</label>
+    `;
+    document.body.appendChild(menu);
+    const rect = menu.getBoundingClientRect();
+    menu.style.left = `${Math.max(8, Math.min(x, window.innerWidth - rect.width - 8))}px`;
+    menu.style.top = `${Math.max(8, Math.min(y, window.innerHeight - rect.height - 8))}px`;
+    this._tabMenu = menu;
+    this._tabMenuPageId = pageId;
+
+    const nameInput = menu.querySelector(".tabmenu-name");
+    const doRename = async () => {
+      const val = nameInput.value.trim();
+      this._closeTabMenu();
+      if (val && val !== page.name) {
+        await page.update({ name: val });
+        this.render(true);
+      }
+    };
+    menu.querySelector(".tabmenu-rename").addEventListener("click", doRename);
+    nameInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        doRename();
+      }
+    });
+
+    const deselectSwatches = () =>
+      menu.querySelectorAll(".tabmenu-swatch").forEach(s => s.classList.remove("selected"));
+    menu.querySelectorAll(".tabmenu-swatch").forEach(sw => {
+      sw.addEventListener("click", async () => {
+        deselectSwatches();
+        sw.classList.add("selected");
+        const wrap = this._tabWrapFor(pageId);
+        wrap?.style.setProperty("--tab-color", sw.dataset.color);
+        await this._persistTabUi(page, { color: sw.dataset.color });
+      });
+    });
+    menu.querySelector(".tabmenu-custom").addEventListener("input", async (e) => {
+      deselectSwatches();
+      const wrap = this._tabWrapFor(pageId);
+      wrap?.style.setProperty("--tab-color", e.target.value);
+      await this._persistTabUi(page, { color: e.target.value });
+    });
+    menu.querySelector(".tabmenu-clear").addEventListener("click", async () => {
+      deselectSwatches();
+      const wrap = this._tabWrapFor(pageId);
+      wrap?.style.removeProperty("--tab-color");
+      await this._persistTabUi(page, { color: null });
+    });
+    menu.querySelector(".tabmenu-optcheck").addEventListener("change", async (e) => {
+      const wrap = this._tabWrapFor(pageId);
+      if (wrap) {
+        wrap.classList.toggle("has-check", e.target.checked);
+        if (e.target.checked && !wrap.querySelector(".tab-check")) {
+          const cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.className = "tab-check";
+          cb.dataset.pageId = pageId;
+          cb.title = "Toggle done";
+          wrap.prepend(cb);
+        } else if (!e.target.checked) {
+          wrap.querySelector(".tab-check")?.remove();
+        }
+      }
+      await this._persistTabUi(page, { showCheckbox: e.target.checked });
+    });
+
+    nameInput.focus();
+    nameInput.select();
+
+    this._tabMenuOutside = (e) => {
+      if (!menu.contains(e.target)) this._closeTabMenu();
+    };
+    this._tabMenuKey = (e) => {
+      if (e.key === "Escape") this._closeTabMenu();
+    };
+    setTimeout(() => {
+      document.addEventListener("click", this._tabMenuOutside);
+      document.addEventListener("keydown", this._tabMenuKey);
+    }, 0);
+  }
+
+  /* -------------------------------------------- */
+  /*  Tabs overflow — fold into dropdown on collision  */
+  /* -------------------------------------------- */
+
+  /**
+   * When the tab strip grows wide enough to collide with the header control
+   * buttons (zoom / fit / mode / share / close on the right), tabs are folded
+   * from right to left into a "more tabs" dropdown. The toggle lives at the
+   * right end of the tab strip; the panel drops below it. Folded tabs keep
+   * full functionality (select, × delete, right-click tab menu, done checkbox).
+   *
+   * Unlike the old hardcoded ">3 tabs" rule, this is purely geometry-driven:
+   * tabs fold only when they actually overlap the controls, and unfold again
+   * when there is room. A ResizeObserver on the header re-evaluates on every
+   * resize, page add/remove, or rename.
+   */
+  _setupTabsOverflow(htmlEl) {
+    const toggle = htmlEl.querySelector(".almanach-tabs-toggle");
+    const panel = htmlEl.querySelector(".almanach-tabs-panel");
+    if (!toggle || !panel) return;
+    this._tabsOverflowToggle = toggle;
+    this._tabsOverflowPanel = panel;
+    // Both nodes come from the template and are rebuilt on every render, so
+    // the panel always starts closed.
+    this._isTabsOverflowOpen = false;
+
+    /* Ensure folded tabs that were moved into the panel on a previous render
+     * are restored to the strip so measurement starts from a clean slate.
+     * The template re-creates wraps from Handlebars anyway, but DOM nodes
+     * could persist across partial re-renders. */
+    const strip = htmlEl.querySelector(".almanach-tabs");
+    if (strip) {
+      for (const w of Array.from(panel.querySelectorAll(":scope > .almanach-tab-wrap"))) {
+        strip.insertBefore(w, toggle);
+      }
+    }
+
+    toggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const opening = !this._isTabsOverflowOpen;
+      this._isTabsOverflowOpen = opening;
+      if (opening) {
+        // Drop the panel directly below the toggle. It lives in the header's
+        // controls wrap (the tab strip's overflow-x would clip a dropdown),
+        // so it is positioned from the toggle's screen rect instead.
+        const r = toggle.getBoundingClientRect();
+        panel.style.top = `${r.bottom + 6}px`;
+        panel.style.left = `${r.left}px`;
+        panel.classList.add("open");
+        const pr = panel.getBoundingClientRect();
+        if (pr.right > window.innerWidth - 8) {
+          panel.style.left = `${Math.max(8, window.innerWidth - pr.width - 8)}px`;
+        }
+      } else {
+        panel.classList.remove("open");
+      }
+      toggle.classList.toggle("open", this._isTabsOverflowOpen);
+    });
+    panel.addEventListener("click", (e) => {
+      if (e.target.closest(".almanach-tab-btn")) {
+        this._isTabsOverflowOpen = false;
+        panel.classList.remove("open");
+        toggle.classList.remove("open");
+      }
+    });
+    if (!this._tabsOutsideClick) {
+      this._tabsOutsideClick = (e) => {
+        if (!this._isTabsOverflowOpen) return;
+        const p = this._tabsOverflowPanel;
+        const t = this._tabsOverflowToggle;
+        if (p && !p.contains(e.target) && !(t && t.contains(e.target))) {
+          this._isTabsOverflowOpen = false;
+          p.classList.remove("open");
+          t?.classList.remove("open");
+        }
+      };
+      document.addEventListener("click", this._tabsOutsideClick);
+    }
+
+    this._evaluateTabsOverflow();
+  }
+
+  /**
+   * Geometry-driven tab folding: fold tabs from the right edge of the strip
+   * into the dropdown until the strip no longer overlaps the controls wrap.
+   * Unfold from the panel back to the strip when there's spare room.
+   *
+   * How it works:
+   *  1. All tab wraps are returned to the strip (clean slate).
+   *  2. Measure the controls wrap's left edge — that's the boundary.
+   *  3. From the rightmost tab, fold into the panel until the last visible
+   *     tab clears the controls with an 8px safety gap.
+   *  4. If any tabs were folded, the toggle appears (~36px). Re-check the
+   *     last visible tab still clears the toggle; fold more if needed.
+   *  5. Update the toggle badge and auto-close the panel if nothing is left.
+   *
+   * Unfolding happens naturally: every evaluation starts from step 1 (all
+   * tabs restored to the strip), so when the window grows, previously folded
+   * tabs simply stay in the strip because they fit.
+   */
+  _evaluateTabsOverflow() {
+    const toggle = this._tabsOverflowToggle;
+    const panel = this._tabsOverflowPanel;
+    if (!toggle || !panel) return;
+
+    const strip = this.element?.querySelector(".almanach-tabs");
+    const controlsWrap = this.element?.querySelector(".almanach-controls-wrap");
+    if (!strip || !controlsWrap) return;
+
+    /* -- Step 1: restore everything to the strip for clean measurement -- */
+    for (const w of Array.from(panel.querySelectorAll(":scope > .almanach-tab-wrap"))) {
+      strip.insertBefore(w, toggle);
+    }
+
+    const wrapsInStrip = Array.from(
+      strip.querySelectorAll(":scope > .almanach-tab-wrap")
+    );
+    if (wrapsInStrip.length === 0) {
+      toggle.style.display = "none";
+      return;
+    }
+
+    /* -- Step 2: measure available space -- */
+    // Temporarily hide the toggle so it doesn't affect measurement.
+    toggle.style.display = "none";
+
+    const controlsRect = controlsWrap.getBoundingClientRect();
+    const SAFETY_GAP = 8; // breathing room between tabs and controls
+    const availableRight = controlsRect.left - SAFETY_GAP;
+
+    /* -- Step 3: fold from right until no overlap -- */
+    for (let i = wrapsInStrip.length - 1; i >= 0; i--) {
+      const wrap = wrapsInStrip[i];
+      const wrapRight = wrap.getBoundingClientRect().right;
+      if (wrapRight > availableRight) {
+        panel.insertBefore(wrap, panel.firstChild);
+      } else {
+        // This tab fits — all earlier tabs fit too (they're further left).
+        break;
+      }
+    }
+
+    /* -- Step 4: account for toggle width -- */
+    // If tabs were folded, the toggle becomes visible and consumes ~36px
+    // at the right end of the strip. Re-check that the last visible tab
+    // still clears the controls with the toggle shown; if not, fold more.
+    const foldedSoFar = panel.querySelectorAll(":scope > .almanach-tab-wrap").length;
+    if (foldedSoFar > 0) {
+      toggle.style.display = "";
+      const toggleRect = toggle.getBoundingClientRect();
+      const remaining = Array.from(
+        strip.querySelectorAll(":scope > .almanach-tab-wrap")
+      );
+      for (let i = remaining.length - 1; i >= 0; i--) {
+        const wrapRight = remaining[i].getBoundingClientRect().right;
+        if (wrapRight > toggleRect.left - 4) {
+          panel.insertBefore(remaining[i], panel.firstChild);
+        } else {
+          break;
+        }
+      }
+    }
+
+    /* -- Step 5: recount and update toggle badge -- */
+    const finalFolded = Array.from(panel.querySelectorAll(":scope > .almanach-tab-wrap"));
+    toggle.querySelector(".tabs-badge").textContent = String(finalFolded.length);
+    toggle.style.display = finalFolded.length > 0 ? "" : "none";
+
+    if (this._isTabsOverflowOpen && finalFolded.length === 0) {
+      this._isTabsOverflowOpen = false;
+      panel.classList.remove("open");
+      toggle.classList.remove("open");
+    }
   }
 
   /**
@@ -337,7 +755,12 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
 
     measureAndApply();
 
-    this._headerResizeObserver = new ResizeObserver(() => measureAndApply());
+    this._headerResizeObserver = new ResizeObserver(() => {
+      measureAndApply();
+      // Re-evaluate tab folding — the strip may need to fold/unfold tabs
+      // as the window width changes.
+      this._evaluateTabsOverflow();
+    });
     this._headerResizeObserver.observe(header);
 
     this._headerOutsideClickHandler = (e) => {
@@ -360,8 +783,88 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
    * translate mouse movement inside the iframe's unscaled coordinate space into
    * screen-pixel scroll deltas.
    */
-  _renderRawHtmlIntoContainer(container, rawHtml) {
+  /* -------------------------------------------- */
+  /*  Scene Workbench autosave                     */
+  /* -------------------------------------------- */
+
+  _stopWorkbenchAutosave() {
+    if (this._wbAutosaveInterval) {
+      clearInterval(this._wbAutosaveInterval);
+      this._wbAutosaveInterval = null;
+    }
+  }
+
+  /**
+   * Uploaded interactive documents built with the Steelbound Scene Workbench
+   * keep their state in a private closure and mirror it to localStorage
+   * (fixed key `steelbound-scene-workbench-v1`) on every edit. On load they
+   * restore from the `#embedded-scene` JSON, NOT localStorage — so to make
+   * edits stick, the latest state must be spliced back into that JSON inside
+   * the page's rawHtml flag.
+   *
+   * This polls the iframe's localStorage (2 s) and, when the state drifts
+   * from the last checkpoint, writes the updated rawHtml via the standard
+   * save path. It detects the document by its `#embedded-scene` script tag,
+   * so every page holding a similar document gets the same treatment. The
+   * localStorage slot is re-seeded with the page's own state on load
+   * because the workbench shares one key across all scenes.
+   */
+  _setupWorkbenchAutosave(iframe, page) {
+    this._stopWorkbenchAutosave();
+    if (!this.isEditable || !iframe || !page) return;
+
+    const WB_KEY = "steelbound-scene-workbench-v1";
+
+    let idoc;
+    try {
+      idoc = iframe.contentDocument;
+    } catch {
+      return;
+    }
+    const sceneScript = idoc?.querySelector("script#embedded-scene");
+    if (!idoc || !sceneScript) return; // not a Scene Workbench document
+
+    let seed;
+    try {
+      seed = JSON.parse(sceneScript.textContent.trim());
+    } catch {
+      return;
+    }
+
+    try {
+      iframe.contentWindow.localStorage.setItem(WB_KEY, JSON.stringify(seed));
+    } catch {
+      return;
+    }
+
+    let lastState = JSON.stringify(seed);
+
+    this._wbAutosaveInterval = setInterval(() => {
+      try {
+        const latest = iframe.contentWindow?.localStorage.getItem(WB_KEY);
+        if (!latest || latest === lastState) return;
+        lastState = latest;
+        const currentRaw = getPageRawHtml(page);
+        const m = currentRaw.match(/(<script id="embedded-scene" type="application\/json">)([\s\S]*?)(<\/script>)/);
+        if (!m) return;
+        // Same escaping the workbench applies when serializing.
+        const escaped = latest.replace(/</g, "\\u003c");
+        const updated =
+          currentRaw.slice(0, m.index) + m[1] + escaped + m[3] +
+          currentRaw.slice(m.index + m[0].length);
+        setPageRawHtml(page, updated).catch(err =>
+          console.error("Cypher Almanach | Workbench autosave failed", err)
+        );
+        console.log("Cypher Almanach | Workbench changes auto-saved to page", page.name);
+      } catch (err) {
+        console.error("Cypher Almanach | Workbench autosave error", err);
+      }
+    }, 2000);
+  }
+
+  _renderRawHtmlIntoContainer(container, rawHtml, page) {
     this._disconnectFitObserver();
+    this._stopWorkbenchAutosave();
     container.innerHTML = "";
     container.removeAttribute("style");
     container.className = "almanach-rendered-container";
@@ -435,6 +938,11 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
         if (idoc) this._bindCypherDomEvents(idoc);
       } catch (err) {
         console.warn("Cypher Almanach | Unable to bind Cypher triggers inside iframe", err);
+      }
+      try {
+        this._setupWorkbenchAutosave(iframe, page);
+      } catch (err) {
+        console.warn("Cypher Almanach | Unable to start workbench autosave", err);
       }
       fitToContainer();
       this._setupContentPanning(container, idoc);
@@ -523,6 +1031,14 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
   }
 
   _bindCypherDomEvents(container) {
+    // Right-click any image (static or dynamically added, e.g. workbench
+    // panels) → fancy image menu. Delegated on the document so late-rendered
+    // content is covered without rebinding.
+    container.addEventListener("contextmenu", (e) => {
+      const img = e.target?.closest?.("img");
+      if (img) this._onImageContextMenu(e, img);
+    });
+
     container.querySelectorAll("[data-cypher-roll]").forEach(btn => {
       btn.addEventListener("click", (e) => {
         e.preventDefault();
@@ -539,6 +1055,138 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
         this._executeStatCheck(stat, cost);
       });
     });
+  }
+
+  /* -------------------------------------------- */
+  /*  Image right-click menu                       */
+  /* -------------------------------------------- */
+
+  _closeImageMenu() {
+    if (this._imgMenu) {
+      this._imgMenu.remove();
+      this._imgMenu = null;
+    }
+    if (this._imgMenuKey) {
+      document.removeEventListener("keydown", this._imgMenuKey);
+      this._imgMenuKey = null;
+    }
+    if (this._imgMenuOut) {
+      document.removeEventListener("mousedown", this._imgMenuOut);
+      this._imgMenuOut = null;
+    }
+  }
+
+  _onImageContextMenu(e, img) {
+    e.preventDefault();
+    e.stopPropagation();
+    const src = img.currentSrc || img.src;
+    if (!src) return;
+    const fileName = decodeURIComponent(String(src).split("?")[0].split("/").pop() || "");
+    const title = img.alt || img.title || fileName || "Image";
+
+    // The event fired inside the preview iframe, which is transform-scaled —
+    // convert iframe-viewport coords to page coords before opening the menu
+    // in the parent document.
+    let x = e.clientX ?? 0;
+    let y = e.clientY ?? 0;
+    const iframe = this.element?.querySelector?.(".almanach-rendered-iframe");
+    if (iframe) {
+      const rect = iframe.getBoundingClientRect();
+      const scale = this._currentScale || 1;
+      x = rect.left + x * scale;
+      y = rect.top + y * scale;
+    }
+    this._openImageMenu(x, y, src, title);
+  }
+
+  _openImageMenu(x, y, src, title) {
+    this._closeImageMenu();
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => (
+      { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+    ));
+    const isGM = game.user?.isGM;
+    const players = (game.users ?? []).filter(u => u.active && !u.isGM);
+
+    const menu = document.createElement("div");
+    menu.className = "almanach-imgmenu";
+    const item = (action, icon, label, extra = "") =>
+      `<button type="button" class="almanach-imgmenu-item" data-img-action="${action}">` +
+      `<i class="fas ${icon}"></i><span>${esc(label)}</span>${extra}</button>`;
+    menu.innerHTML = `
+      ${item("open", "fa-arrow-up-right-from-square", "Open image")}
+      ${isGM ? item("share-all", "fa-users", "Show to all players") : ""}
+      ${isGM ? `
+      <button type="button" class="almanach-imgmenu-item almanach-imgmenu-sub-toggle" data-img-action="toggle-players">
+        <i class="fas fa-user-check"></i><span>Show to players</span><i class="fas fa-caret-down almanach-imgmenu-caret"></i>
+      </button>
+      <div class="almanach-imgmenu-players" hidden>
+        ${players.length
+          ? players.map(u =>
+              `<label class="almanach-imgmenu-player"><input type="checkbox" value="${u.id}" checked> <span>${esc(u.name)}</span></label>`
+            ).join("")
+          : `<div class="almanach-imgmenu-none">No active players</div>`}
+        <button type="button" class="almanach-imgmenu-item almanach-imgmenu-show" data-img-action="share-selected">
+          <i class="fas fa-eye"></i><span>Show</span>
+        </button>
+      </div>` : ""}
+      ${item("viewer", "fa-window-maximize", "Show in viewer")}
+    `;
+    document.body.appendChild(menu);
+
+    // Viewport clamp, same math as the tab context menu.
+    const mw = menu.offsetWidth;
+    const mh = menu.offsetHeight;
+    const px = Math.max(8, Math.min(x, window.innerWidth - mw - 8));
+    const py = Math.max(8, Math.min(y, window.innerHeight - mh - 8));
+    menu.style.left = `${px}px`;
+    menu.style.top = `${py}px`;
+
+    menu.addEventListener("click", (ev) => {
+      const btn = ev.target.closest("[data-img-action]");
+      if (!btn) return;
+      const action = btn.dataset.imgAction;
+      if (action === "toggle-players") {
+        const sub = menu.querySelector(".almanach-imgmenu-players");
+        if (sub) {
+          sub.hidden = !sub.hidden;
+          btn.classList.toggle("open", !sub.hidden);
+        }
+        return;
+      }
+      if (action === "open") {
+        window.open(src, "_blank", "noopener");
+      } else if (action === "share-all") {
+        const pop = new ImagePopout(src, { title, shareable: true });
+        pop.shareImage();
+      } else if (action === "share-selected") {
+        const ids = Array.from(menu.querySelectorAll(".almanach-imgmenu-player input:checked"))
+          .map(i => i.value);
+        if (!ids.length) return;
+        const pop = new ImagePopout(src, { title, shareable: true, users: ids });
+        pop.shareImage();
+      } else if (action === "viewer") {
+        new AlmanachImageViewer({
+          id: `cypher-almanach-image-viewer-${foundry.utils.randomID()}`,
+          src,
+          title
+        }).render(true);
+      }
+      this._closeImageMenu();
+    });
+
+    this._imgMenuOut = (ev) => {
+      if (this._imgMenu && !this._imgMenu.contains(ev.target)) this._closeImageMenu();
+    };
+    this._imgMenuKey = (ev) => {
+      if (ev.key === "Escape") {
+        ev.stopPropagation();
+        this._closeImageMenu();
+      }
+    };
+    setTimeout(() => document.addEventListener("mousedown", this._imgMenuOut), 0);
+    document.addEventListener("keydown", this._imgMenuKey);
+
+    this._imgMenu = menu;
   }
 
   _bindUploadHandlers(htmlEl) {
@@ -630,11 +1278,18 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
     if (!this.isEditable) return;
     const doc = this.document;
     const pageId = target.dataset.pageId;
-    if (pageId) {
+    if (!pageId) return;
+    const page = doc.pages.get(pageId);
+    if (!page) return;
+    try {
       await doc.deleteEmbeddedDocuments("JournalEntryPage", [pageId]);
-      this._activePageId = null;
-      this.render(true);
+    } catch (err) {
+      console.error("Cypher Almanach | Failed to delete page", err);
+      ui.notifications.error(`Failed to delete page "${page.name}".`);
+      return;
     }
+    if (this._activePageId === pageId) this._activePageId = null;
+    this.render(true);
   }
 
   static #onSetMode(event, target) {
