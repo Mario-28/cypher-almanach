@@ -102,6 +102,17 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
     this._headerDragCleanup = null;
   }
 
+  /** Document lock (flag "locked" on the entry): when locked, editing and
+   * control actions are refused for everyone except the GM and document
+   * owners, who can also unlock it again. */
+  get _isLocked() { return !!this.document.getFlag?.(MODULE_ID, "locked"); }
+  get _canControlLock() {
+    return game.user.isGM || !!this.document.testUserPermission?.(game.user, "OWNER");
+  }
+  get _isEffectivelyEditable() {
+    return this.isEditable && (!this._isLocked || this._canControlLock);
+  }
+
   static DEFAULT_OPTIONS = {
     id: "cypher-almanach-{id}",
     classes: ["cypher-almanach-window", "glassmorphic-journal"],
@@ -130,6 +141,8 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
       configureOwnership: CypherAlmanachSheet.#onConfigureOwnership,
       toggleCypherBar: CypherAlmanachSheet.#onToggleCypherBar,
       shareToPlayers: CypherAlmanachSheet.#onShareToPlayers,
+      toggleLock: CypherAlmanachSheet.#onToggleLock,
+      wysiwygImage: CypherAlmanachSheet.#onWysiwygImage,
       closeWindow: CypherAlmanachSheet.#onCloseWindow,
       rollStat: CypherAlmanachSheet.#onRollStat,
       rollCypherD20: CypherAlmanachSheet.#onRollCypherD20,
@@ -161,8 +174,12 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
     const context = await super._prepareContext?.(options) || {};
     const doc = this.document;
     context.document = doc;
-    context.isEditable = this.isEditable;
+    context.isEditable = this._isEffectivelyEditable;
     context.isGM = game.user.isGM;
+    context.isLocked = this._isLocked;
+    context.canToggleLock = this._canControlLock;
+    // A user the lock applies to never gets left sitting in an editor.
+    if (this._isLocked && !this._canControlLock && this._editorMode !== "preview") this._editorMode = "preview";
     context.editorMode = this._editorMode;
     context.isPreviewMode = this._editorMode === "preview";
     context.isWysiwygMode = this._editorMode === "wysiwyg";
@@ -183,7 +200,7 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
     }
 
     const authorId = doc?.author?.id ?? null;
-    context.canDeletePages = this.isEditable && (game.user.isGM || authorId === game.user.id);
+    context.canDeletePages = context.isEditable && (game.user.isGM || authorId === game.user.id);
 
     context.pages = pages.map(p => {
       const tabUi = p.getFlag?.(MODULE_ID, "tabUi") || {};
@@ -211,6 +228,7 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
     const docNameInput = htmlEl.querySelector(".almanach-doc-name-input");
     if (docNameInput) {
       const updateTitle = async () => {
+        if (!this._isEffectivelyEditable) return;
         const val = docNameInput.value.trim();
         if (val && val !== this.document.name) {
           await this.document.update({ name: val });
@@ -244,6 +262,28 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
           document.execCommand(cmd, false, val);
         });
       });
+
+      /* Image editing: remember the caret so the insert dialog can put the
+       * new figure exactly where the user was typing, and double-click any
+       * image to reopen its edit dialog. */
+      const ed = htmlEl.querySelector(".almanach-wysiwyg-editor");
+      if (ed && this._isEffectivelyEditable) {
+        const saveSel = () => {
+          const sel = window.getSelection();
+          if (sel.rangeCount > 0 && ed.contains(sel.anchorNode)) {
+            this._savedWysiwygRange = sel.getRangeAt(0).cloneRange();
+          }
+        };
+        ed.addEventListener("keyup", saveSel);
+        ed.addEventListener("mouseup", saveSel);
+        ed.addEventListener("dblclick", (e) => {
+          const img = e.target.closest("img");
+          if (img) {
+            e.preventDefault();
+            this._openImageDialog(img);
+          }
+        });
+      }
     }
 
     this._bindUploadHandlers(htmlEl);
@@ -260,6 +300,7 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
       htmlEl.addEventListener("change", async (e) => {
         const cb = e.target.closest?.(".tab-check");
         if (!cb || cb.disabled) return;
+        if (!this._isEffectivelyEditable) return;
         cb.closest(".almanach-tab-wrap")?.classList.toggle("checked", cb.checked);
         const page = this.document.pages.get(cb.dataset.pageId);
         if (page) await this._persistTabUi(page, { checked: cb.checked });
@@ -382,7 +423,7 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
     this._tabCtxBound = true;
     htmlEl.addEventListener("contextmenu", (e) => {
       const wrap = e.target.closest(".almanach-tab-wrap");
-      if (!wrap || !this.isEditable) return;
+      if (!wrap || !this._isEffectivelyEditable) return;
       e.preventDefault();
       this._openTabMenu(e.clientX, e.clientY, wrap.dataset.pageId);
     });
@@ -811,7 +852,7 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
    */
   _setupWorkbenchAutosave(iframe, page) {
     this._stopWorkbenchAutosave();
-    if (!this.isEditable || !iframe || !page) return;
+    if (!this._isEffectivelyEditable || !iframe || !page) return;
 
     const WB_KEY = "steelbound-scene-workbench-v1";
 
@@ -1220,7 +1261,7 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
   }
 
   async _loadHtmlFile(file) {
-    if (!this.isEditable) return;
+    if (!this._isEffectivelyEditable) return;
     try {
       const text = await file.text();
       const doc = this.document;
@@ -1259,7 +1300,7 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
   }
 
   static async #onCreatePage(event, target) {
-    if (!this.isEditable) return;
+    if (!this._isEffectivelyEditable) return;
     const doc = this.document;
     const count = doc.pages.size + 1;
     const created = await doc.createEmbeddedDocuments("JournalEntryPage", [{
@@ -1275,7 +1316,7 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
 
   static async #onDeletePage(event, target) {
     event.stopPropagation();
-    if (!this.isEditable) return;
+    if (!this._isEffectivelyEditable) return;
     const doc = this.document;
     const pageId = target.dataset.pageId;
     if (!pageId) return;
@@ -1294,10 +1335,10 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
 
   static #onSetMode(event, target) {
     const mode = target.dataset.mode;
-    if (mode) {
-      this._editorMode = mode;
-      this.render(true);
-    }
+    if (!mode) return;
+    if (mode !== "preview" && !this._isEffectivelyEditable) return;
+    this._editorMode = mode;
+    this.render(true);
   }
 
   static #onToggleFitMode(event, target) {
@@ -1329,7 +1370,7 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
   }
 
   static async #onSaveContent(event, target) {
-    if (!this.isEditable || !this._activePageId) return;
+    if (!this._isEffectivelyEditable || !this._activePageId) return;
     const htmlEl = this.element;
     const pageTitleInput = htmlEl.querySelector(".almanach-page-title-input");
     const docNameInput = htmlEl.querySelector(".almanach-doc-name-input");
@@ -1494,6 +1535,206 @@ class CypherAlmanachSheet extends HandlebarsApplicationMixin(DocumentSheetV2) {
       width: 440
     });
 
+    dialog.render(true);
+  }
+
+  /* -------------------------------------------- */
+  /*  Document lock                                */
+  /* -------------------------------------------- */
+
+  static async #onToggleLock(event, target) {
+    if (!this._canControlLock) {
+      ui.notifications.warn("Only the document's owner can lock or unlock this Almanach.");
+      return;
+    }
+    const locked = !this._isLocked;
+    await this.document.setFlag(MODULE_ID, "locked", locked);
+    if (locked && this._editorMode !== "preview") this._editorMode = "preview";
+    ui.notifications.info(locked
+      ? "Almanach locked — only the owner (or GM) can edit or unlock it."
+      : "Almanach unlocked — editing is available again.");
+    this.render(true);
+  }
+
+  /* -------------------------------------------- */
+  /*  WYSIWYG image insert / edit (with floating)  */
+  /* -------------------------------------------- */
+
+  static #onWysiwygImage(event, target) {
+    if (!this._isEffectivelyEditable) return;
+    this._openImageDialog(null);
+  }
+
+  _restoreWysiwygCaret(editor) {
+    editor.focus();
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    const r = this._savedWysiwygRange;
+    if (r && editor.contains(r.commonAncestorContainer)) {
+      sel.addRange(r);
+    } else {
+      const end = document.createRange();
+      end.selectNodeContents(editor);
+      end.collapse(false);
+      sel.addRange(end);
+    }
+  }
+
+  _imageFigureHtml(v) {
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => (
+      { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+    ));
+    const width = Math.max(10, Math.min(100, Number(v.width) || 45));
+    let figStyle;
+    if (v.float === "left") figStyle = `float:left;max-width:${width}%;margin:0.3em 1em 0.5em 0;`;
+    else if (v.float === "right") figStyle = `float:right;max-width:${width}%;margin:0.3em 0 0.5em 1em;`;
+    else figStyle = `max-width:${width}%;margin:0.6em auto;`;
+    let html = `<figure class="almanach-img${v.float !== "none" ? ` float-${v.float}` : ""}" style="${figStyle}">` +
+      `<img src="${esc(v.src)}" alt="${esc(v.alt)}" style="width:100%;display:block;border-radius:6px;">`;
+    if (v.caption) {
+      html += `<figcaption style="font-size:0.78em;opacity:0.7;text-align:center;padding-top:3px;">${esc(v.caption)}</figcaption>`;
+    }
+    return html + "</figure>";
+  }
+
+  /**
+   * Insert-or-edit dialog for WYSIWYG images. Source comes from a URL/path
+   * field or the core file picker; the figure wraps the img so text can
+   * float around it (inline styles — the preview renders the stored HTML in
+   * a bare srcdoc iframe with no module CSS, so float/margin must travel
+   * with the markup). Double-click an image in the editor to reopen this.
+   */
+  _openImageDialog(existingImg) {
+    const editor = this.element?.querySelector(".almanach-wysiwyg-editor");
+    if (!editor || !this._isEffectivelyEditable) return;
+    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => (
+      { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+    ));
+
+    let fig = existingImg ? existingImg.closest("figure.almanach-img") : null;
+    const cur = { src: "", alt: "", caption: "", width: 45, float: "none" };
+    const imgEl = fig ? fig.querySelector("img") : existingImg;
+    if (imgEl) {
+      cur.src = imgEl.getAttribute("src") || "";
+      cur.alt = imgEl.getAttribute("alt") || "";
+      cur.caption = fig?.querySelector("figcaption")?.textContent?.trim() || "";
+      const st = fig?.getAttribute("style") || "";
+      if (/float:\s*left/.test(st)) cur.float = "left";
+      else if (/float:\s*right/.test(st)) cur.float = "right";
+      const mw = st.match(/max-width:\s*(\d+)%/);
+      if (mw) cur.width = Number(mw[1]);
+    }
+
+    const content = `
+      <form class="almanach-img-form">
+        <div class="form-group">
+          <label>Image source</label>
+          <div class="form-fields">
+            <input type="text" name="src" value="${esc(cur.src)}" placeholder="path/or URL…" style="flex:1;" />
+            <button type="button" class="browse-img-btn" title="Browse Foundry files"><i class="fa-solid fa-folder-open"></i></button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Alt text</label>
+          <div class="form-fields"><input type="text" name="alt" value="${esc(cur.alt)}" placeholder="Describe the image" /></div>
+        </div>
+        <div class="form-group">
+          <label>Caption (optional)</label>
+          <div class="form-fields"><input type="text" name="caption" value="${esc(cur.caption)}" placeholder="Shown under the image" /></div>
+        </div>
+        <div class="form-group">
+          <label>Width</label>
+          <div class="form-fields">
+            <input type="range" name="width" min="10" max="100" step="5" value="${cur.width}" />
+            <span class="img-width-val">${cur.width}%</span>
+          </div>
+        </div>
+        <div class="form-group"
+          <label>Floating</label>
+          <div class="form-fields">
+            <select name="float">
+              <option value="none"${cur.float === "none" ? " selected" : ""}>Own row (no float)</option>
+              <option value="left"${cur.float === "left" ? " selected" : ""}>Float left — text wraps on the right</option>
+              <option value="right"${cur.float === "right" ? " selected" : ""}>Float right — text wraps on the left</option>
+            </select>
+          </div>
+        </div>
+        <p class="notes" style="margin:6px 0 0;">Floating images wrap body text around them. The same float is used in the rendered preview.</p>
+      </form>`;
+
+    const readForm = (root) => ({
+      src: root.querySelector('[name="src"]').value.trim(),
+      alt: root.querySelector('[name="alt"]').value.trim(),
+      caption: root.querySelector('[name="caption"]').value.trim(),
+      width: Number(root.querySelector('[name="width"]').value),
+      float: root.querySelector('[name="float"]').value
+    });
+
+    const dialog = new Dialog({
+      title: existingImg ? "Edit Image" : "Insert Image",
+      content,
+      buttons: {
+        save: {
+          icon: '<i class="fa-solid fa-check"></i>',
+          label: existingImg ? "SAVE" : "INSERT",
+          callback: (html) => {
+            const root = html instanceof HTMLElement ? html : html[0];
+            const v = readForm(root);
+            if (!v.src) {
+              ui.notifications.warn("Image source is empty — pick a file or paste a URL first.");
+              return;
+            }
+            const htmlOut = this._imageFigureHtml(v);
+            if (fig || existingImg) {
+              const tmp = document.createElement("div");
+              tmp.innerHTML = htmlOut;
+              const node = tmp.firstElementChild;
+              if (fig) fig.replaceWith(node);
+              else existingImg.replaceWith(node);
+            } else {
+              this._restoreWysiwygCaret(editor);
+              document.execCommand("insertHTML", false, htmlOut);
+              this._savedWysiwygRange = null;
+            }
+            ui.notifications.info("Image placed — press Save to write it into the page.");
+          }
+        },
+        ...(existingImg ? {
+          remove: {
+            icon: '<i class="fa-solid fa-trash"></i>',
+            label: "REMOVE",
+            callback: () => {
+              if (fig) fig.remove();
+              else existingImg.remove();
+              ui.notifications.info("Image removed — press Save to write the change.");
+            }
+          }
+        } : {}),
+        cancel: {
+          icon: '<i class="fa-solid fa-xmark"></i>',
+          label: "CANCEL",
+          callback: () => {}
+        }
+      },
+      default: "save",
+      render: (html) => {
+        const root = html instanceof HTMLElement ? html : html[0];
+        const srcInput = root.querySelector('[name="src"]');
+        root.querySelector(".browse-img-btn")?.addEventListener("click", () => {
+          new FilePicker({
+            type: "image",
+            current: srcInput.value,
+            callback: (path) => { srcInput.value = path; }
+          }).render(true);
+        });
+        const range = root.querySelector('[name="width"]');
+        const val = root.querySelector(".img-width-val");
+        range?.addEventListener("input", () => { val.textContent = `${range.value}%`; });
+      }
+    }, {
+      classes: ["cypher-almanach-dialog", "glassmorphic-dialog"],
+      width: 480
+    });
     dialog.render(true);
   }
 

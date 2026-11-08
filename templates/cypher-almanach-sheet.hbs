@@ -90,6 +90,15 @@
         {{/unless}}
         {{/if}}
 
+        {{#if canToggleLock}}
+        <button type="button" class="almanach-btn almanach-lock-btn{{#if isLocked}} locked{{/if}}" data-action="toggleLock" title="{{#if isLocked}}Unlock — allow editing again (owner only){{else}}Lock — only the owner can edit or unlock{{/if}}">
+          <i class="fa-solid {{#if isLocked}}fa-lock{{else}}fa-lock-open{{/if}}"></i>
+          <span class="btn-label">{{#if isLocked}}Unlock{{else}}Lock{{/if}}</span>
+        </button>
+        {{else if isLocked}}
+        <span class="almanach-btn almanach-lock-badge" title="Locked by the owner — read only"><i class="fa-solid fa-lock"></i><span class="btn-label">Locked</span></span>
+        {{/if}}
+
         <button type="button" class="almanach-btn almanach-cypher-btn" data-action="toggleCypherBar" title="Cypher Quick Rollers">
           <i class="fa-solid fa-dice-d20"></i>
           <span class="btn-label">Cypher Rollers</span>
@@ -163,9 +172,10 @@
               <button type="button" class="wysiwyg-cmd-btn" data-cmd="formatBlock" data-val="p" title="Paragraph">P</button>
               <button type="button" class="wysiwyg-cmd-btn" data-cmd="insertUnorderedList" title="Bullet List"><i class="fa-solid fa-list-ul"></i></button>
               <button type="button" class="wysiwyg-cmd-btn" data-cmd="insertOrderedList" title="Numbered List"><i class="fa-solid fa-list-ol"></i></button>
+              <button type="button" class="wysiwyg-tool-btn" data-action="wysiwygImage" title="Insert image (file picker or URL, with floating options). Double-click an image in the text to edit it."><i class="fa-solid fa-image"></i></button>
             </div>
           </div>
-          <div class="almanach-wysiwyg-editor custom-scroll" contenteditable="true" data-page-id="{{activePage.id}}">
+          <div class="almanach-wysiwyg-editor custom-scroll" contenteditable="{{#if isEditable}}true{{else}}false{{/if}}" data-page-id="{{activePage.id}}">
             {{{activePageRawHtml}}}
           </div>
         </div>

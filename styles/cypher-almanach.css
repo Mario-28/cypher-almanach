@@ -711,3 +711,21 @@
   border: 1px solid rgba(0, 240, 255, 0.18);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
 }
+
+/* ---------- WYSIWYG image tool + document lock (v1.20.0) ---------- */
+.wysiwyg-tool-btn { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #e6edf3; border-radius: 4px; padding: 4px 8px; font-size: 0.8rem; cursor: pointer; transition: all 0.15s ease; }
+.wysiwyg-tool-btn:hover { background: rgba(0, 240, 255, 0.2); color: #00f0ff; }
+
+.almanach-wysiwyg-editor img { max-width: 100%; }
+.almanach-wysiwyg-editor figure.almanach-img { outline: 1px dashed transparent; transition: outline-color 0.15s ease; }
+.almanach-wysiwyg-editor figure.almanach-img:hover { outline-color: rgba(0, 240, 255, 0.55); }
+.almanach-wysiwyg-editor figure.almanach-img img { cursor: pointer; }
+
+.almanach-lock-btn.locked { color: #ffb454; border-color: rgba(255, 180, 84, 0.55); background: rgba(255, 180, 84, 0.12); }
+.almanach-lock-btn.locked:hover { color: #ffcf87; border-color: #ffb454; background: rgba(255, 180, 84, 0.22); }
+.almanach-lock-badge { cursor: default; opacity: 0.85; color: #ffb454; border-color: rgba(255, 180, 84, 0.35); }
+.almanach-lock-badge:hover { background: transparent; color: #ffb454; border-color: rgba(255, 180, 84, 0.35); }
+
+.almanach-img-form .browse-img-btn { flex: 0 0 auto; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.15); color: #e6edf3; border-radius: 4px; padding: 3px 10px; cursor: pointer; }
+.almanach-img-form .browse-img-btn:hover { background: rgba(0, 240, 255, 0.2); color: #00f0ff; }
+.almanach-img-form .img-width-val { min-width: 40px; text-align: right; font-variant-numeric: tabular-nums; }

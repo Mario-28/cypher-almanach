@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.20.0
+
+- **WYSIWYG image insert & edit.** New image button in the visual editor's toolbar opens a dialog with: image source via Foundry's file picker or a pasted URL/path, alt text, optional caption, a width slider (10–100 % of text width), and a floating mode — *Float left / Float right* wraps body text around the image, *no float* keeps it on its own row. Images are inserted as a `<figure class="almanach-img">` with inline float/margin styles, so the same wrapping renders inside the preview's bare srcdoc iframe (no module CSS in there). Double-click any image while editing to reopen the dialog and change source/size/float/caption or remove it. The caret position is remembered, so inserts land exactly where you were typing.
+- **Document lock.** New Lock button in the header (keyhole icon, next to Save). Stores a `locked` flag on the journal entry. While locked, every mutating path is refused for non-owners: editors and mode switching, Save, page create/delete, tab context menu and enable/disable checkboxes, .html upload, Scene Workbench autosave, and the title input — locked-out users are also dropped back to Preview automatically, and the editor becomes read-only. Only the GM or a document owner can make changes or toggle the lock; everyone else sees a read-only "Locked" badge instead of the button. Flag changes propagate to already-open sheets on other clients.
+
+
 ## 1.19.0
 
 - **Geometry-driven tab folding.** Tabs now fold into the "more tabs" dropdown only when they actually collide with the header control buttons (zoom, fit, mode, share, close) — not on a hardcoded count. The tab strip's horizontal scroll has been replaced by intelligent folding: as the window shrinks, tabs fold from right to left into the dropdown; as it grows, they unfold back. Both the tab overflow and header collapse re-evaluate on every resize via a shared ResizeObserver.
